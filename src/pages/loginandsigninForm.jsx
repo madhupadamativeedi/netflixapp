@@ -1,5 +1,15 @@
-import React, { useRef, useState } from "react";
-import {checkvalidateSignUp, checkvalidateSignIn} from "../utils/validate";
+import React, { useEffect, useRef, useState } from "react";
+import { checkvalidateSignUp, checkvalidateSignIn } from "../utils/validate";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useDispatch } from "react-redux";
+import { clearUser, setUser } from "../utils/userSlice";
+import { useNavigate } from "react-router-dom";
 
 const LoginandsigninForm = () => {
   const [signState, setSignState] = useState(false);
@@ -16,36 +26,104 @@ const LoginandsigninForm = () => {
   const passwordref = useRef(null);
   const nameref = useRef(null);
 
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   // TOGGLE FORM
-  const toggleSign = () => {setSignState(!signState)
+  const toggleSign = () => {
+    setSignState(!signState);
     emailref.current.value = "";
     passwordref.current.value = "";
   };
 
+
+
   // SIGN IN
   const handleSignInForm = () => {
-      checkvalidateSignIn(emailref.current.value,passwordref.current.value,setEmailError,setPasswordError);
-};
+    const error = checkvalidateSignIn(
+      emailref.current.value,
+      passwordref.current.value,
+      setEmailError,
+      setPasswordError,
+    );
 
-// SIGN UP
-const handleSignUpForm = () => {
-      checkvalidateSignUp(nameref.current.value,emailref.current.value,passwordref.current.value,setEmailError,setPasswordError, setNameError);
-   
- 
+    if (error) return;
+
+    signInWithEmailAndPassword(
+      auth,
+      emailref.current.value,
+      passwordref.current.value,
+    )
+      .then((userCredential) => {
+        const user = userCredential.user;
+        console.log("User signed in:", user);
+        navigate("/browse");
+        // ...
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        navigate("/");
+        console.log("Error signing in:", errorMessage);
+      });
   };
- 
+
+  // SIGN UP
+  const handleSignUpForm = () => {
+    const error = checkvalidateSignUp(
+      nameref.current.value,
+      emailref.current.value,
+      passwordref.current.value,
+      setEmailError,
+      setPasswordError,
+      setNameError,
+    );
+    if (error) return;
+    createUserWithEmailAndPassword(
+      auth,
+      emailref.current.value,
+      passwordref.current.value,
+    )
+      .then((userCredential) => {
+        const user = userCredential.user;
+        console.log("User created:", user);
+        updateProfile(user, {
+          displayName: nameref.current.value,
+          photoURL: "https://logodix.com/logo/2209501.jpg",
+        })
+          .then(() => {
+            const { uid, email, displayName,photoURL  } = auth.currentUser || {};
+            dispatch(
+              setUser({
+                uid: uid,
+                email: email,
+                name: displayName,
+                photoURL:photoURL
+              }),
+            );
+            navigate("/browse");
+          })
+          .catch((error) => {
+            console.log("Error updating profile:", error.message);
+          });
+      })
+      .catch((error) => {
+        dispatch(clearUser());
+        navigate("/");
+        console.log(error.message);
+      });
+  };
+
 
   return (
     <div
       className="w-1/4 absolute top-[55%] left-1/2 py-8 px-10 
       -translate-x-1/2 -translate-y-1/2 bg-black/80 z-10 rounded-md"
     >
-      {/* TITLE */}
       <h1 className="text-white text-4xl font-extrabold pb-8">
         {signState ? "Sign up" : "Sign in"}
       </h1>
 
-      {/* NAME FIELD */}
       {signState && (
         <div className="w-full relative mt-4">
           <label
@@ -64,9 +142,10 @@ const handleSignUpForm = () => {
           />
         </div>
       )}
-      {nameError && <p className="text-red-500 text-sm mt-1 font-extrabold">{nameError}</p>}
+      {nameError && (
+        <p className="text-red-500 text-sm mt-1 font-extrabold">{nameError}</p>
+      )}
 
-      {/* EMAIL FIELD */}
       <div className="w-full relative mt-4">
         <label
           className={`absolute left-3 pointer-events-none transition-all duration-200
@@ -83,9 +162,10 @@ const handleSignUpForm = () => {
           onBlur={(e) => !e.target.value && setEmailFocus(false)}
         />
       </div>
-      {emailError && <p className="text-red-500 text-sm mt-1 font-extrabold">{emailError}</p>}
+      {emailError && (
+        <p className="text-red-500 text-sm mt-1 font-extrabold">{emailError}</p>
+      )}
 
-      {/* PASSWORD FIELD */}
       <div className="w-full relative mt-4">
         <label
           className={`absolute left-3 pointer-events-none transition-all duration-200
@@ -102,9 +182,12 @@ const handleSignUpForm = () => {
           onBlur={(e) => !e.target.value && setPasswordFocus(false)}
         />
       </div>
-        {passwordError && <p className="text-red-500 text-sm mt-1 font-extrabold">{passwordError}</p>}
+      {passwordError && (
+        <p className="text-red-500 text-sm mt-1 font-extrabold">
+          {passwordError}
+        </p>
+      )}
 
-      {/* MAIN BUTTON */}
       <button
         onClick={signState ? handleSignUpForm : handleSignInForm}
         className="w-full h-12 bg-[#E50914] text-white rounded mt-5 font-bold cursor-pointer hover:bg-red-700 transition duration-200"
@@ -112,16 +195,19 @@ const handleSignUpForm = () => {
         {signState ? "Sign Up" : "Sign In"}
       </button>
 
+      {!signState && (
+        <div className="text-center mt-4 text-white/60">
+          <p>OR</p>
+          <button
+            className="w-full h-12 bg-white/20 text-white cursor-pointer rounded 
+      mt-3 font-bold hover:bg-white/10 transition duration-200"
+          >
+            Use a Sign In Code{" "}
+          </button>
+          <p className="mt-4 underline cursor-pointer">Forgot Password?</p>
+        </div>
+      )}
 
-      {!signState && ( <div className="text-center mt-4 text-white/60"> 
-      <p>OR</p> 
-      <button className="w-full h-12 bg-white/20 text-white cursor-pointer rounded 
-      mt-3 font-bold hover:bg-white/10 transition duration-200">
-       Use a Sign In Code </button>
-       <p className="mt-4 underline cursor-pointer">Forgot Password?</p> 
-       </div> )}
-
-      {/* TOGGLE TEXT */}
       <div className="text-white/60 mt-6">
         {signState ? "Already have an account?" : "New to Netflix?"}
 
