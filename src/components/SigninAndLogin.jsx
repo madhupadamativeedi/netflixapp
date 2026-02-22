@@ -12,7 +12,7 @@ const SigninAndLogin = () => {
           alt="netflix"
           className="w-full h-screen object-cover relative scale-130 skew-y-7"
         />
-        <Hedder />
+        {/* <Hedder /> */}
       </div>
       <div>
         <LoginandsigninForm />
